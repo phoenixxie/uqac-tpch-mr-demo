@@ -139,25 +139,6 @@ public class TPCHTester extends Configured implements Tool {
 		}
 	}
 
-	public static class Combiner extends
-			Reducer<IntWritable, DoubleWritable, IntWritable, DoubleWritable> {
-
-		@Override
-		protected void reduce(IntWritable key, Iterable<DoubleWritable> values,
-				Context context) throws IOException, InterruptedException {
-
-			Double sum = 0D;
-			Iterator<DoubleWritable> itr = values.iterator();
-			while (itr.hasNext()) {
-				DoubleWritable nxt = itr.next();
-				sum += nxt.get();
-			}
-
-			context.write(new IntWritable(1), new DoubleWritable(sum));
-		}
-
-	}
-
 	public static class Combine extends
 			Reducer<IntWritable, DoubleWritable, IntWritable, DoubleWritable> {
 
