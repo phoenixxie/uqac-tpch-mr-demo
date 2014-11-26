@@ -38,9 +38,35 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 
-public class TPCHTester extends Configured implements Tool {
+public class TPCHQ12 extends Configured implements Tool {
 	static final String SEPERATOR = "|";
 
+	// select
+	// l_shipmode,
+	// sum(case
+	// when o_orderpriority ='1-URGENT'
+	// or o_orderpriority ='2-HIGH'
+	// then 1
+	// else 0
+	// end
+	// ) as high_line_count,
+	// sum(case
+	// when o_orderpriority <> '1-URGENT'
+	// and o_orderpriority <> '2-HIGH'
+	// then 1
+	// else 0
+	// end
+	// ) as low_line_count
+	// from
+	// orders o join lineitem l
+	// on
+	// o.o_orderkey = l.l_orderkey and l.l_commitdate < l.l_receiptdate
+	// and l.l_shipdate < l.l_commitdate and l.l_receiptdate >= '1994-01-01'
+	// and l.l_receiptdate < '1995-01-01'
+	// where
+	// l.l_shipmode = 'MAIL' or l.l_shipmode = 'SHIP'
+	// group by l_shipmode
+	// order by l_shipmode;
 	public static class JoinMapper extends
 			Mapper<LongWritable, Text, Text, Text> {
 		public static final Log l4j = LogFactory.getLog(JoinMapper.class);
@@ -91,7 +117,7 @@ public class TPCHTester extends Configured implements Tool {
 				if (numRows == nextCntr) {
 					long used_memory = memoryMXBean.getHeapMemoryUsage()
 							.getUsed();
-					l4j.info("TPCHTester.Map: processing " + numRows
+					l4j.info("TPCHQ12.JoinMapper: processing " + numRows
 							+ " rows: used memory = " + used_memory);
 					nextCntr = getNextCntr(numRows);
 				}
@@ -188,7 +214,7 @@ public class TPCHTester extends Configured implements Tool {
 			}
 
 			if (o_orderpriority == null) {
-				l4j.error("TPCHTester.Reduce: cannot find key " + key
+				l4j.error("TPCHQ12.Reduce: cannot find key " + key
 						+ " from Order");
 				return;
 			}
@@ -199,7 +225,7 @@ public class TPCHTester extends Configured implements Tool {
 					if (numRows == nextCntr) {
 						long used_memory = memoryMXBean.getHeapMemoryUsage()
 								.getUsed();
-						l4j.info("TPCHTester.Reduce: processing " + numRows
+						l4j.info("TPCHQ12.JoinReducer: processing " + numRows
 								+ " rows: used memory = " + used_memory);
 						nextCntr = getNextCntr(numRows);
 					}
@@ -272,7 +298,7 @@ public class TPCHTester extends Configured implements Tool {
 				if (numRows == nextCntr) {
 					long used_memory = memoryMXBean.getHeapMemoryUsage()
 							.getUsed();
-					l4j.info("TPCHTester.Map: processing " + numRows
+					l4j.info("TPCHQ12.GroupMapper: processing " + numRows
 							+ " rows: used memory = " + used_memory);
 					nextCntr = getNextCntr(numRows);
 				}
@@ -309,7 +335,6 @@ public class TPCHTester extends Configured implements Tool {
 		private long numRows = 0;
 		private long nextCntr = 1;
 
-		private Splitter splitter;
 		private Text keyText = new Text();
 		private Text dataText = new Text();
 
@@ -321,8 +346,6 @@ public class TPCHTester extends Configured implements Tool {
 					+ memoryMXBean.getHeapMemoryUsage().getMax());
 
 			isLogInfoEnabled = l4j.isInfoEnabled();
-
-			splitter = Splitter.on(SEPERATOR).trimResults();
 		}
 
 		@Override
@@ -339,7 +362,7 @@ public class TPCHTester extends Configured implements Tool {
 					if (numRows == nextCntr) {
 						long used_memory = memoryMXBean.getHeapMemoryUsage()
 								.getUsed();
-						l4j.info("TPCHTester.Reduce: processing " + numRows
+						l4j.info("TPCHQ12.GroupReducer: processing " + numRows
 								+ " rows: used memory = " + used_memory);
 						nextCntr = getNextCntr(numRows);
 					}
@@ -377,8 +400,8 @@ public class TPCHTester extends Configured implements Tool {
 		String outfile = "/tmp/q12";
 		Path tempPath = new Path(tempfile);
 
-		Job joinJob = Job.getInstance(conf, "TPCHJoin");
-		joinJob.setJarByClass(TPCHTester.class);
+		Job joinJob = Job.getInstance(conf, "TPCHQ12Join");
+		joinJob.setJarByClass(TPCHQ12.class);
 
 		FileInputFormat.addInputPaths(joinJob, infiles);
 		FileOutputFormat.setOutputPath(joinJob, tempPath);
@@ -392,8 +415,8 @@ public class TPCHTester extends Configured implements Tool {
 			return 1;
 		}
 
-		Job groupJob = Job.getInstance(conf, "TPCHGroup");
-		groupJob.setJarByClass(TPCHTester.class);
+		Job groupJob = Job.getInstance(conf, "TPCHQ12Group");
+		groupJob.setJarByClass(TPCHQ12.class);
 
 		FileInputFormat.addInputPath(groupJob, tempPath);
 		FileOutputFormat.setOutputPath(groupJob, new Path(outfile));
@@ -407,7 +430,7 @@ public class TPCHTester extends Configured implements Tool {
 	}
 
 	public static void main(String[] args) throws Exception {
-		int exitCode = ToolRunner.run(new TPCHTester(), args);
+		int exitCode = ToolRunner.run(new TPCHQ12(), args);
 		System.exit(exitCode);
 	}
 }
