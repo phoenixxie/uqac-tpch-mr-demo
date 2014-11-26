@@ -78,12 +78,9 @@ public class TPCHQ6 extends Configured implements Tool {
 			l4j.info("maximum memory = "
 					+ memoryMXBean.getHeapMemoryUsage().getMax());
 
+			isLogInfoEnabled = l4j.isInfoEnabled();
+
 			splitter = Splitter.on(SEPERATOR).trimResults();
-
-			FileSplit fileSplit = (FileSplit) context.getInputSplit();
-			String filename = fileSplit.getPath().getName();
-
-			l4j.info("Parsing " + filename);
 		}
 
 		@Override
@@ -223,8 +220,8 @@ public class TPCHQ6 extends Configured implements Tool {
 		selectJob.setMapperClass(SelectMapper.class);
 		selectJob.setCombinerClass(SelectReducer.class);
 		selectJob.setReducerClass(SelectReducer.class);
-		selectJob.setOutputKeyClass(Text.class);
-		selectJob.setOutputValueClass(Text.class);
+		selectJob.setOutputKeyClass(IntWritable.class);
+		selectJob.setOutputValueClass(DoubleWritable.class);
 
 		return selectJob.waitForCompletion(true) ? 0 : 1;
 	}

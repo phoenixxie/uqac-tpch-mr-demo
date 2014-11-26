@@ -68,7 +68,7 @@ public class TPCHQ12 extends Configured implements Tool {
 	// group by l_shipmode
 	// order by l_shipmode;
 	public static class JoinMapper extends
-			Mapper<LongWritable, Text, Text, Text> {
+			Mapper<LongWritable, Text, IntWritable, Text> {
 		public static final Log l4j = LogFactory.getLog(JoinMapper.class);
 		public static MemoryMXBean memoryMXBean;
 
@@ -84,7 +84,6 @@ public class TPCHQ12 extends Configured implements Tool {
 
 		private Splitter splitter;
 
-		private Text keyText = new Text();
 		private Text dataText = new Text();
 		private boolean isLineItem;
 
@@ -95,6 +94,7 @@ public class TPCHQ12 extends Configured implements Tool {
 			memoryMXBean = ManagementFactory.getMemoryMXBean();
 			l4j.info("maximum memory = "
 					+ memoryMXBean.getHeapMemoryUsage().getMax());
+			isLogInfoEnabled = l4j.isInfoEnabled();
 
 			splitter = Splitter.on(SEPERATOR).trimResults();
 
@@ -109,7 +109,7 @@ public class TPCHQ12 extends Configured implements Tool {
 		protected void map(
 				LongWritable key,
 				Text value,
-				org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, Text, Text>.Context context)
+				org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, IntWritable, Text>.Context context)
 				throws IOException, InterruptedException {
 
 			if (isLogInfoEnabled) {
@@ -126,6 +126,7 @@ public class TPCHQ12 extends Configured implements Tool {
 			List<String> values = Lists.newArrayList(splitter.split(value
 					.toString()));
 
+			int keyInt;
 			if (isLineItem) {
 				String l_orderkey = values.get(L_ORDERKEY);
 				String l_shipdate = values.get(L_SHIPDATE);
@@ -149,17 +150,17 @@ public class TPCHQ12 extends Configured implements Tool {
 					return;
 				}
 
-				keyText.set(l_orderkey);
+				keyInt = Integer.parseInt(l_orderkey);
 				dataText.set("L|" + l_shipmode);
 			} else {
 				String o_orderkey = values.get(O_ORDERKEY);
 				String o_orderpriority = values.get(O_ORDERPRIORITY);
 
-				keyText.set(o_orderkey);
+				keyInt = Integer.parseInt(o_orderkey);
 				dataText.set("O|" + o_orderpriority);
 			}
 
-			context.write(keyText, dataText);
+			context.write(new IntWritable(keyInt), dataText);
 		}
 
 		private long getNextCntr(long cntr) {
@@ -171,7 +172,8 @@ public class TPCHQ12 extends Configured implements Tool {
 		}
 	}
 
-	public static class JoinReducer extends Reducer<Text, Text, Text, Text> {
+	public static class JoinReducer extends
+			Reducer<IntWritable, Text, IntWritable, Text> {
 
 		public static final Log l4j = LogFactory.getLog(JoinReducer.class);
 		public static MemoryMXBean memoryMXBean;
@@ -181,8 +183,8 @@ public class TPCHQ12 extends Configured implements Tool {
 		private long nextCntr = 1;
 
 		private Splitter splitter;
-		private Text keyText = new Text();
 		private Text dataText = new Text();
+		private List<String> shipmodes = new ArrayList<String>();
 
 		@Override
 		protected void setup(Context context) throws IOException,
@@ -197,19 +199,32 @@ public class TPCHQ12 extends Configured implements Tool {
 		}
 
 		@Override
-		protected void reduce(Text key, java.lang.Iterable<Text> values,
+		protected void reduce(IntWritable key, java.lang.Iterable<Text> values,
 				JoinReducer.Context context) throws IOException,
 				InterruptedException {
 
+			if (isLogInfoEnabled) {
+				numRows++;
+				if (numRows == nextCntr) {
+					long used_memory = memoryMXBean.getHeapMemoryUsage()
+							.getUsed();
+					l4j.info("TPCHQ12.JoinReducer: processing " + numRows
+							+ " rows: used memory = " + used_memory);
+					nextCntr = getNextCntr(numRows);
+				}
+			}
+			
+			shipmodes.clear();
 			String o_orderpriority = null;
-
+			
 			for (Text value : values) {
 				List<String> parts = Lists.newArrayList(splitter.split(value
 						.toString()));
 
 				if (parts.get(0).equals("O")) {
 					o_orderpriority = parts.get(1);
-					break;
+				} else {
+					shipmodes.add(parts.get(1));
 				}
 			}
 
@@ -219,27 +234,9 @@ public class TPCHQ12 extends Configured implements Tool {
 				return;
 			}
 
-			for (Text value : values) {
-				if (isLogInfoEnabled) {
-					numRows++;
-					if (numRows == nextCntr) {
-						long used_memory = memoryMXBean.getHeapMemoryUsage()
-								.getUsed();
-						l4j.info("TPCHQ12.JoinReducer: processing " + numRows
-								+ " rows: used memory = " + used_memory);
-						nextCntr = getNextCntr(numRows);
-					}
-				}
-
-				List<String> parts = Lists.newArrayList(splitter.split(value
-						.toString()));
-
-				if (parts.get(0).equals("O")) {
-					continue;
-				}
-				dataText.set(o_orderpriority + "|" + parts.get(1));
+			for (String shipmode : shipmodes) {
+				dataText.set(o_orderpriority + "|" + shipmode);
 				context.write(key, dataText);
-
 			}
 
 		}
@@ -277,13 +274,9 @@ public class TPCHQ12 extends Configured implements Tool {
 			memoryMXBean = ManagementFactory.getMemoryMXBean();
 			l4j.info("maximum memory = "
 					+ memoryMXBean.getHeapMemoryUsage().getMax());
+			isLogInfoEnabled = l4j.isInfoEnabled();
 
 			splitter = Splitter.on(SEPERATOR).trimResults();
-
-			FileSplit fileSplit = (FileSplit) context.getInputSplit();
-			String filename = fileSplit.getPath().getName();
-
-			l4j.info("Parsing " + filename);
 		}
 
 		@Override
@@ -328,14 +321,13 @@ public class TPCHQ12 extends Configured implements Tool {
 
 	public static class GroupReducer extends Reducer<Text, Text, Text, Text> {
 
-		public static final Log l4j = LogFactory.getLog(JoinReducer.class);
+		public static final Log l4j = LogFactory.getLog(GroupReducer.class);
 		public static MemoryMXBean memoryMXBean;
 		private boolean isLogInfoEnabled = false;
 
 		private long numRows = 0;
 		private long nextCntr = 1;
 
-		private Text keyText = new Text();
 		private Text dataText = new Text();
 
 		@Override
@@ -350,9 +342,9 @@ public class TPCHQ12 extends Configured implements Tool {
 
 		@Override
 		protected void reduce(Text key, java.lang.Iterable<Text> values,
-				JoinReducer.Context context) throws IOException,
+				GroupReducer.Context context) throws IOException,
 				InterruptedException {
-			
+
 			int high = 0;
 			int low = 0;
 
@@ -367,9 +359,9 @@ public class TPCHQ12 extends Configured implements Tool {
 						nextCntr = getNextCntr(numRows);
 					}
 				}
-				
+
 				String v = value.toString();
-				
+
 				if (v.equals("1-URGENT") || v.equals("2-HIGH")) {
 					++high;
 				} else {
@@ -408,9 +400,9 @@ public class TPCHQ12 extends Configured implements Tool {
 
 		joinJob.setMapperClass(JoinMapper.class);
 		joinJob.setReducerClass(JoinReducer.class);
-		joinJob.setOutputKeyClass(Text.class);
+		joinJob.setOutputKeyClass(IntWritable.class);
 		joinJob.setOutputValueClass(Text.class);
-		
+
 		if (!joinJob.waitForCompletion(true)) {
 			return 1;
 		}
