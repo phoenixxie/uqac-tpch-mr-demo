@@ -7,7 +7,7 @@
 	<packaging>jar</packaging>
 	<name>TPCHTester</name>
 	<properties>
-		<hadoop.version>2.5.0-mr1-cdh5.2.0</hadoop.version>
+		<hadoop.version>2.5.0-cdh5.2.0</hadoop.version>
 		<hive.version>0.13.1-cdh5.2.0</hive.version>
 	</properties>
 
@@ -51,7 +51,25 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-client</artifactId>
+			<artifactId>hadoop-common</artifactId>
+			<version>${hadoop.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-hdfs</artifactId>
+			<version>${hadoop.version}</version>
+			<scope>provided</scope>
+		</dependency>
+			<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-hdfs</artifactId>
+			<version>${hadoop.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-mapreduce-client-core</artifactId>
 			<version>${hadoop.version}</version>
 			<scope>provided</scope>
 		</dependency>
